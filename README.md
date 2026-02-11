@@ -1,4 +1,4 @@
-# shirmp — OpenClaw-like MVP (Python)
+# shrimp — OpenClaw-like MVP (Python)
 
 這是一個「類 OpenClaw」的極簡 MVP：
 - **Console** 互動式聊天
