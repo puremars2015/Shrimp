@@ -1,0 +1,198 @@
+1) 安裝依賴
+在你自己的專案資料夾：
+npm i @mariozechner/pi-ai
+
+2) demo 檔：codex-oauth-demo.mjs
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { getModel, streamSimple } from "@mariozechner/pi-ai";
+import { getOAuthApiKey } from "@mariozechner/pi-ai/dist/utils/oauth/index.js"; // 或：from "@mariozechner/pi-ai" (取決於你 bundler/環境)
+
+async function loadClawdbotOpenAICodexCreds() {
+  // Clawdbot 預設會把 auth profiles 放在 ~/.clawdbot/auth-profiles.json
+  // （若你有自訂 agentDir，就改成那個資料夾）
+  const authPath = path.join(os.homedir(), ".clawdbot", "auth-profiles.json");
+
+  const raw = await fs.readFile(authPath, "utf-8");
+  const store = JSON.parse(raw);
+
+  // 找第一個 openai-codex 的 oauth profile（例如 "openai-codex:default" 或 "openai-codex:<email>"）
+  const profiles = store?.profiles ?? {};
+  for (const [profileId, cred] of Object.entries(profiles)) {
+    if (!profileId.startsWith("openai-codex:")) continue;
+    if (!cred || typeof cred !== "object") continue;
+    if (cred.type !== "oauth") continue;
+    if (cred.provider !== "openai-codex") continue;
+
+    // cred 形狀大致是：
+    // { type:"oauth", provider:"openai-codex", access, refresh, expires, accountId?, email? ... }
+    return cred;
+  }
+
+  throw new Error(`No openai-codex oauth credentials found in ${authPath}`);
+}
+
+async function main() {
+  // 1) 讀取 Clawdbot 的 OAuth creds
+  const oauthCreds = await loadClawdbotOpenAICodexCreds();
+
+  // 2) 取得可用的 access token（會在 expires 到期後自動 refresh）
+  const refreshed = await getOAuthApiKey("openai-codex", { "openai-codex": oauthCreds });
+  if (!refreshed) throw new Error("No OAuth credentials resolved for openai-codex");
+
+  const apiKey = refreshed.apiKey; // 這裡就是 access token（JWT）
+  // 注意：如果你要把 refresh 後的新 credentials 寫回檔案，需要你自己做（Clawdbot 會做）
+  // refreshed.newCredentials 會帶回新的 access/refresh/expires/accountId
+
+  // 3) 選模型（這裡用 Clawdbot 常見的 openai-codex/gpt-5.2）
+  const model = getModel("openai-codex", "gpt-5.2");
+
+  // 4) 準備 context（pi-ai 的格式）
+  const context = {
+    systemPrompt: "你是一個精簡但清楚的助理。",
+    messages: [
+      {
+        role: "user",
+        content: "請用三點說明 Clawdbot 的 runner 如何處理 OAuth token 並呼叫 LLM。",
+        timestamp: Date.now(),
+      },
+    ],
+  };
+
+  // 5) 串流呼叫（真正打到 chatgpt.com/backend-api/codex/responses）
+  const stream = streamSimple(model, context, {
+    apiKey,
+    reasoning: "low",      // 可選：minimal/low/medium/high/xhigh（依模型支援）
+    maxTokens: 800,        // 可選
+    sessionId: "demo-1"1) 安裝依賴
+在你自己的專案資料夾：
+npm i @mariozechner/pi-ai
+
+2) demo 檔：codex-oauth-demo.mjs
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { getModel, streamSimple } from "@mariozechner/pi-ai";
+import { getOAuthApiKey } from "@mariozechner/pi-ai/dist/utils/oauth/index.js"; // 或：from "@mariozechner/pi-ai" (取決於你 bundler/環境)
+
+async function loadClawdbotOpenAICodexCreds() {
+  // Clawdbot 預設會把 auth profiles 放在 ~/.clawdbot/auth-profiles.json
+  // （若你有自訂 agentDir，就改成那個資料夾）
+  const authPath = path.join(os.homedir(), ".clawdbot", "auth-profiles.json");
+
+  const raw = await fs.readFile(authPath, "utf-8");
+  const store = JSON.parse(raw);
+
+  // 找第一個 openai-codex 的 oauth profile（例如 "openai-codex:default" 或 "openai-codex:<email>"）
+  const profiles = store?.profiles ?? {};
+  for (const [profileId, cred] of Object.entries(profiles)) {
+    if (!profileId.startsWith("openai-codex:")) continue;
+    if (!cred || typeof cred !== "object") continue;
+    if (cred.type !== "oauth") continue;
+    if (cred.provider !== "openai-codex") continue;
+
+    // cred 形狀大致是：
+    // { type:"oauth", provider:"openai-codex", access, refresh, expires, accountId?, email? ... }
+    return cred;
+  }
+
+  throw new Error(`No openai-codex oauth credentials found in ${authPath}`);
+}
+
+async function main() {
+  // 1) 讀取 Clawdbot 的 OAuth creds
+  const oauthCreds = await loadClawdbotOpenAICodexCreds();
+
+  // 2) 取得可用的 access token（會在 expires 到期後自動 refresh）
+  const refreshed = await getOAuthApiKey("openai-codex", { "openai-codex": oauthCreds });
+  if (!refreshed) throw new Error("No OAuth credentials resolved for openai-codex");
+
+  const apiKey = refreshed.apiKey; // 這裡就是 access token（JWT）
+  // 注意：如果你要把 refresh 後的新 credentials 寫回檔案，需要你自己做（Clawdbot 會做）
+  // refreshed.newCredentials 會帶回新的 access/refresh/expires/accountId
+
+  // 3) 選模型（這裡用 Clawdbot 常見的 openai-codex/gpt-5.2）
+  const model = getModel("openai-codex", "gpt-5.2");
+
+  // 4) 準備 context（pi-ai 的格式）
+  const context = {
+    systemPrompt: "你是一個精簡但清楚的助理。",
+    messages: [
+      {
+        role: "user",
+        content: "請用三點說明 Clawdbot 的 runner 如何處理 OAuth token 並呼叫 LLM。",
+        timestamp: Date.now(),
+      },
+    ],
+  };
+
+  // 5) 串流呼叫（真正打到 chatgpt.com/backend-api/codex/responses）
+  const stream = streamSimple(model, context, {
+    apiKey,
+    reasoning: "low",      // 可選：minimal/low/medium/high/xhigh（依模型支援）
+    maxTokens: 800,        // 可選
+    sessionId: "demo-1",   // 可選：給 prompt cache / session routing 用
+  });
+
+  for await (const evt of stream) {
+    if (evt.type === "text_delta") process.stdout.write(evt.delta);
+    if (evt.type === "error") {
+      console.error("\n\nERROR:", evt.error.errorMessage);
+    }
+  }
+
+  const finalMsg = await stream.result();
+  console.log("\n\n--- DONE ---");
+  console.log({
+    stopReason: finalMsg.stopReason,
+    usage: finalMsg.usage,
+    model: `${finalMsg.provider}/${finalMsg.model}`,
+  });
+}
+
+main().catch((e) => {
+  console.error("Fatal:", e?.message ?? e);
+  process.exit(1);
+});
+執行：
+node codex-oauth-demo.mjs
+
+3) 這份範例背後做了什麼（對照 Clawdbot）
+* getOAuthApiKey("openai-codex", ...)：對應 Clawdbot 的 resolveApiKeyForProfile(...) → 會 refresh token
+* streamSimple(model, context, { apiKey })：對應 Clawdbot 最終的 streamSimple / activeSession.prompt() 送出請求這條 provider 實作會打：https://chatgpt.com/backend-api/codex/responses（pi-ai 裡寫死的 CODEX_URL）
+
+如果你希望範例「不靠 Clawdbot auth-profiles.json」，而是 直接跑 loginOpenAICodex() 互動登入 → 立刻打一個 prompt，我也可以再給你那個版本（會開瀏覽器、localhost:1455 callback）。你要哪一種？
+,   // 可選：給 prompt cache / session routing 用
+  });
+
+  for await (const evt of stream) {
+    if (evt.type === "text_delta") process.stdout.write(evt.delta);
+    if (evt.type === "error") {
+      console.error("\n\nERROR:", evt.error.errorMessage);
+    }
+  }
+
+  const finalMsg = await stream.result();
+  console.log("\n\n--- DONE ---");
+  console.log({
+    stopReason: finalMsg.stopReason,
+    usage: finalMsg.usage,
+    model: `${finalMsg.provider}/${finalMsg.model}`,
+  });
+}
+
+main().catch((e) => {
+  console.error("Fatal:", e?.message ?? e);
+  process.exit(1);
+});
+執行：
+node codex-oauth-demo.mjs
+
+3) 這份範例背後做了什麼（對照 Clawdbot）
+* getOAuthApiKey("openai-codex", ...)：對應 Clawdbot 的 resolveApiKeyForProfile(...) → 會 refresh token
+* streamSimple(model, context, { apiKey })：對應 Clawdbot 最終的 streamSimple / activeSession.prompt() 送出請求這條 provider 實作會打：https://chatgpt.com/backend-api/codex/responses（pi-ai 裡寫死的 CODEX_URL）
+
+如果你希望範例「不靠 Clawdbot auth-profiles.json」，而是 直接跑 loginOpenAICodex() 互動登入 → 立刻打一個 prompt，我也可以再給你那個版本（會開瀏覽器、localhost:1455 callback）。你要哪一種？
