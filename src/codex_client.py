@@ -145,6 +145,9 @@ def codex_stream_once(cfg: Config, messages: List[Dict[str, Any]], tools: Option
     text_buf: List[str] = []
     tool_calls: List[Dict[str, Any]] = []
 
+    # print("\n[CODEX REQUEST] POST", CODEX_URL)
+    # print("[CODEX REQUEST BODY]", json.dumps(body, ensure_ascii=False, indent=2))
+
     with httpx.Client(timeout=60.0) as client:
         with client.stream("POST", CODEX_URL, headers=headers, json=body) as resp:
             if resp.status_code >= 400:
@@ -160,6 +163,7 @@ def codex_stream_once(cfg: Config, messages: List[Dict[str, Any]], tools: Option
                 )
             current_tool: Optional[Dict[str, Any]] = None
             for evt in _parse_sse(resp):
+                # print("[CODEX SSE EVENT]", json.dumps(evt, ensure_ascii=False))
                 t = evt.get("type")
                 if t == "response.output_text.delta":
                     delta = evt.get("delta") or ""
@@ -171,7 +175,7 @@ def codex_stream_once(cfg: Config, messages: List[Dict[str, Any]], tools: Option
                             "call_id": item.get("call_id"),
                             "id": item.get("id"),
                             "name": item.get("name"),
-                            "arguments_json": item.get("arguments") or "{}",
+                            "arguments_json": "",
                         }
                 elif t == "response.function_call_arguments.delta" and current_tool is not None:
                     current_tool["arguments_json"] = (current_tool.get("arguments_json") or "") + (evt.get("delta") or "")
@@ -186,9 +190,15 @@ def codex_stream_once(cfg: Config, messages: List[Dict[str, Any]], tools: Option
                                 "name": item.get("name"),
                                 "arguments_json": item.get("arguments") or "{}",
                             }
+                        else:
+                            # Use the final complete arguments from done event if deltas gave nothing
+                            if not current_tool.get("arguments_json"):
+                                current_tool["arguments_json"] = item.get("arguments") or "{}"
                         tool_calls.append(current_tool)
                         current_tool = None
                 elif t == "response.completed":
                     break
 
+    # print("[CODEX RESPONSE TEXT]", "".join(text_buf))
+    # print("[CODEX RESPONSE TOOL_CALLS]", json.dumps(tool_calls, ensure_ascii=False))
     return CodexResponse(text="".join(text_buf), tool_calls=tool_calls)

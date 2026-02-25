@@ -112,11 +112,15 @@ def openai_stream_once(cfg: Config, messages: List[Dict[str, Any]], tools: Optio
     text_buf: List[str] = []
     tool_calls: List[Dict[str, Any]] = []
 
+    # print("\n[OPENAI REQUEST] POST", OPENAI_RESPONSES_URL)
+    # print("[OPENAI REQUEST BODY]", json.dumps(body, ensure_ascii=False, indent=2))
+
     with httpx.Client(timeout=60.0) as client:
         with client.stream("POST", OPENAI_RESPONSES_URL, headers=headers, json=body) as resp:
             resp.raise_for_status()
             current_tool: Optional[Dict[str, Any]] = None
             for evt in _parse_sse(resp):
+                # print("[OPENAI SSE EVENT]", json.dumps(evt, ensure_ascii=False))
                 t = evt.get("type")
                 if t == "response.output_text.delta":
                     text_buf.append(evt.get("delta") or "")
@@ -127,7 +131,7 @@ def openai_stream_once(cfg: Config, messages: List[Dict[str, Any]], tools: Optio
                             "call_id": item.get("call_id"),
                             "id": item.get("id"),
                             "name": item.get("name"),
-                            "arguments_json": item.get("arguments") or "{}",
+                            "arguments_json": "",
                         }
                 elif t == "response.function_call_arguments.delta" and current_tool is not None:
                     current_tool["arguments_json"] = (current_tool.get("arguments_json") or "") + (evt.get("delta") or "")
@@ -141,9 +145,15 @@ def openai_stream_once(cfg: Config, messages: List[Dict[str, Any]], tools: Optio
                                 "name": item.get("name"),
                                 "arguments_json": item.get("arguments") or "{}",
                             }
+                        else:
+                            # Use the final complete arguments from done event if deltas gave nothing
+                            if not current_tool.get("arguments_json"):
+                                current_tool["arguments_json"] = item.get("arguments") or "{}"
                         tool_calls.append(current_tool)
                         current_tool = None
                 elif t == "response.completed":
                     break
 
+    # print("[OPENAI RESPONSE TEXT]", "".join(text_buf))
+    # print("[OPENAI RESPONSE TOOL_CALLS]", json.dumps(tool_calls, ensure_ascii=False))
     return OpenAIResponse(text="".join(text_buf), tool_calls=tool_calls)
